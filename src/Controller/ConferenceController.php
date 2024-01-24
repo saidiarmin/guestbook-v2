@@ -2,7 +2,9 @@
 
 namespace App\Controller;
 
+use App\Entity\Comment;
 use App\Entity\Conference;
+use App\Form\CommentType;
 use App\Repository\CommentRepository;
 use App\Repository\ConferenceRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -32,9 +34,20 @@ class ConferenceController extends AbstractController
         ]);
     }
 
-    #[Route('/conference/{id}', name: 'conference')]
+    #[Route('/conference/{slug}', name: 'conference')]
     public function show(Request $request, Conference $conference): Response
     {
+        $comment = new Comment();
+        $form = $this->createForm(CommentType::class, $comment);
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
+            $comment->setConference($conference);
+
+            $this->commentRepository->save($comment, true);
+
+            return $this->redirectToRoute('conference', ['slug' => $conference->getSlug()]);
+        }
+
         $offset = max(0, $request->query->getInt('offset', 0));
         $paginator = $this->commentRepository->getCommentPaginator($conference, $offset);
 
@@ -42,7 +55,8 @@ class ConferenceController extends AbstractController
             'conference' => $conference,
             'comments' => $paginator,
             'previous' => $offset - CommentRepository::PAGINATOR_PER_PAGE,
-            'next' => min(count($paginator), $offset + CommentRepository::PAGINATOR_PER_PAGE)
+            'next' => min(count($paginator), $offset + CommentRepository::PAGINATOR_PER_PAGE),
+            'comment_form' => $form
         ]);
     }
 }
